@@ -4,7 +4,9 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
+from django_countries.fields import CountryField  
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -41,6 +43,42 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class Address(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="addresses"
+    )
+    address_line1 = models.CharField(max_length=255)  # Street address, house no.
+    address_line2 = models.CharField(max_length=255, blank=True, null=True)  # Apartment, suite, etc.
+    city = models.CharField(max_length=100)
+    state_province = models.CharField(max_length=100, blank=True, null=True)  # State / Province / Region
+    postal_code = models.CharField(max_length=20)  # Zip/Postal code
+    country = CountryField()  # ISO 3166-1 standardized
+    is_primary = models.BooleanField(default=False)  # Default address flag
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Addresses"
+        indexes = [
+            models.Index(fields=["city", "country"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(is_primary=True),
+                name="unique_primary_address_per_user"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.address_line1}, {self.city}, {self.country.name}"
+
+
 
 
 class OTPVerification(models.Model):

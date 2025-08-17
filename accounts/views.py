@@ -1,7 +1,7 @@
 # accounts/views.py
 from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions
-from .serializers import UserSerializer
+from .serializers import UserDetailSerializer, UserListCreateSerializer
 
 User = get_user_model()
 
@@ -32,8 +32,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data["user"] = {
             "id": user.id,
             "email": user.email,
-            "first_name": user.first_name,  
-            "second_name": user.last_name,  
+            "first_name": user.first_name,
+            "second_name": user.last_name,
             "kyc_status": user.kyc_status,
         }
 
@@ -44,22 +44,22 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
-# GET (list all users), POST (create user)
 class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
+
+    def get_serializer_class(self):
+        return UserListCreateSerializer
 
     def get_permissions(self):
         if self.request.method == "POST":
             return [permissions.AllowAny()]
-        return [permissions.IsAdminUser]
+        return [permissions.IsAdminUser()]
 
 
-# GET (detail), PUT/PATCH (update), DELETE (delete)
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]  
+    serializer_class = UserDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
     lookup_field = "id"
 
 

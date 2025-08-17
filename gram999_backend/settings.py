@@ -34,6 +34,7 @@ ALLOWED_HOSTS = [
     "172.10.10.119",  # <-- replace with your computer’s LAN IP
     ".yourdomain.com",  # <-- production domain
     "0.0.0.0",
+    "10.0.2.2",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -43,6 +44,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://your-frontend.com",
     "http://localhost",
     "http://127.0.0.1",
+ 
 ]
 
 # Application definition

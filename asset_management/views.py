@@ -7,11 +7,13 @@ from .serializers import PlatformOptionsSerializer
 from .models import AssetTransaction
 from .serializers import AssetTransactionSerializer
 
-class PlatformOptionsUpdateView(generics.RetrieveUpdateAPIView):
+
+class PlatformOptionsRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = PlatformOptionsSerializer
 
     def get_object(self):
-        return PlatformOptions.objects.get(id=1)
+        obj, created = PlatformOptions.objects.get_or_create(id=1)
+        return obj
 
     def get_permissions(self):
         if self.request.method in permissions.SAFE_METHODS:
@@ -23,12 +25,12 @@ class PlatformOptionsUpdateView(generics.RetrieveUpdateAPIView):
         return [permission() for permission in permission_classes]
 
 
-
 class AssetTransactionCreateUpdateView(generics.CreateAPIView, generics.UpdateAPIView):
     """
     Allows creating and updating asset transactions.
     Ledger is automatically updated via signals.
     """
+
     queryset = AssetTransaction.objects.all()
     serializer_class = AssetTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]

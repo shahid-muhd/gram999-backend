@@ -37,4 +37,5 @@ def fetch_gold_price_and_broadcast():
         print(f"✅ Broadcasted gold price: {gold_price}")
 
     except Exception as e:
-        print(f"❌ Error fetching gold price: {e}")
+        pass
+        # print(f"❌ Error fetching gold price: {e}")
