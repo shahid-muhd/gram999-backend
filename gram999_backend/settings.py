@@ -12,16 +12,28 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+from dotenv import load_dotenv
+import os
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+load_dotenv(BASE_DIR / ".env")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-pka0)@kk=7jnt$6m##e@370gt^b=fn6cmue^31^@nzp=@s3vjl"
+
+
+SHUFTI_CLIENT_ID = os.getenv("SHUFTI_CLIENT_ID")
+SHUFTI_SECRET_KEY = os.getenv("SHUFTI_SECRET_KEY")
+SHUFTI_API_URL = os.getenv("SHUFTI_API_URL")
+LEAN_APP_TOKEN = os.getenv("LEAN_APP_TOKEN")
+LEAN_BASE_URL = os.getenv("LEAN_BASE_URL")
+LEAN_WEBHOOK_SECRET = os.getenv("LEAN_WEBHOOK_SECRET")
+LEAN_CLIENT_ID = os.getenv("LEAN_CLIENT_ID")
+LEAN_CLIENT_SECRET = os.getenv("LEAN_CLIENT_SECRET")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -31,8 +43,10 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "192.168.1.106",
     "192.168.2.54",
-    "172.10.10.119",  # <-- replace with your computer’s LAN IP
-    ".yourdomain.com",  # <-- production domain
+    "172.10.10.119",
+    "192.168.0.248",
+    "handy-moved-monkfish.ngrok-free.app",
+    ".yourdomain.com",
     "0.0.0.0",
     "10.0.2.2",
 ]
@@ -44,7 +58,12 @@ CORS_ALLOWED_ORIGINS = [
     "https://your-frontend.com",
     "http://localhost",
     "http://127.0.0.1",
- 
+]
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://yourdomain.com",
+    "https://handy-moved-monkfish.ngrok-free.app",
 ]
 
 # Application definition
@@ -60,6 +79,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "accounts",
     "investments",
+    "payments",
     "asset_management.apps.AssetManagementConfig",
     "channels",
 ]
@@ -105,6 +125,20 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://172.30.147.217:6379/1",  # notice /1 → DB index 1
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "KEY_PREFIX": "lean",  # a
+        },
+    }
+}
+
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -167,7 +201,7 @@ REST_FRAMEWORK = {
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }

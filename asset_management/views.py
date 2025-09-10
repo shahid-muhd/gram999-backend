@@ -1,13 +1,16 @@
+from .models import PriceAlert
 from django.shortcuts import render
-
+from rest_framework import serializers, viewsets
+from .models import PriceAlert
 # views.py
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions ,status
 from .models import PlatformOptions
 from .serializers import PlatformOptionsSerializer
 from .models import AssetTransaction
-from .serializers import AssetTransactionSerializer
-
-
+from .serializers import AssetTransactionSerializer , PriceAlertSerializer ,PushTokenSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 class PlatformOptionsRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = PlatformOptionsSerializer
 
@@ -39,4 +42,27 @@ class AssetTransactionCreateUpdateView(generics.CreateAPIView, generics.UpdateAP
         serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
+
+class PriceAlertViewSet(viewsets.ModelViewSet):
+    serializer_class = PriceAlertSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PriceAlert.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+from .models import PushToken
+
+class PushTokenViewSet(viewsets.ModelViewSet):
+    serializer_class = PushTokenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PushToken.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
         serializer.save(user=self.request.user)

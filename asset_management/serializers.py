@@ -1,6 +1,6 @@
 # serializers.py
 from rest_framework import serializers
-from .models import PlatformOptions, AssetTransaction, AssetLedger
+from .models import PlatformOptions, AssetTransaction, AssetLedger , PriceAlert ,PushToken
 
 
 class PlatformOptionsSerializer(serializers.ModelSerializer):
@@ -30,3 +30,15 @@ class AssetTransactionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Insufficient quantity to sell.")
 
         return data
+
+
+class PriceAlertSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PriceAlert
+        fields = '__all__'
+    
+
+class PushTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PushToken
+        fields = '__all__'

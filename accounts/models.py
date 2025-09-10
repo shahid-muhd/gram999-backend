@@ -25,24 +25,37 @@ class CustomUserManager(BaseUserManager):
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(unique=True,blank=True,null=True)
-    first_name = models.CharField(max_length=150, blank=True,null=True)
-    last_name = models.CharField(max_length=150, blank=True,null=True)
+    email = models.EmailField(unique=True, blank=True, null=True)
+    first_name = models.CharField(max_length=150, blank=True, null=True)
+    last_name = models.CharField(max_length=150, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=False)
-    emirates_id = models.CharField(max_length=55, blank=True,unique=True,null=True)
-    kyc_status = models.BooleanField(default=False)
+    emirates_id = models.CharField(max_length=55, blank=True, unique=True, null=True)
+
+
+    KYC_STATUSES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("declined", "Declined"),
+        ("review", "Under Review"),
+    ]
+    kyc_status = models.CharField(
+        max_length=20,
+        choices=KYC_STATUSES,
+        default="pending",   
+    )
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
     USERNAME_FIELD = "email"
-    
-    REQUIRED_FIELDS = ['phone'] 
-    
+    REQUIRED_FIELDS = ['phone']
+
     objects = CustomUserManager()
 
     def __str__(self):
         return self.email
+
 
 
 class Address(models.Model):
