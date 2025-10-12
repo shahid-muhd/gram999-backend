@@ -18,7 +18,7 @@ class LedgerEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = LedgerEntry
         fields = "__all__"
-
+        read_only_fields = ("user", "total_value", "created_at")
 
 class BalanceSerializer(serializers.ModelSerializer):
     class Meta:

@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
+from celery.schedules import crontab
 from dotenv import load_dotenv
 import os
 
@@ -26,6 +27,9 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = "django-insecure-pka0)@kk=7jnt$6m##e@370gt^b=fn6cmue^31^@nzp=@s3vjl"
 
 
+BACKEND_URL = os.getenv("BACKEND_URL")
+
+
 SHUFTI_CLIENT_ID = os.getenv("SHUFTI_CLIENT_ID")
 SHUFTI_SECRET_KEY = os.getenv("SHUFTI_SECRET_KEY")
 SHUFTI_API_URL = os.getenv("SHUFTI_API_URL")
@@ -34,6 +38,16 @@ LEAN_BASE_URL = os.getenv("LEAN_BASE_URL")
 LEAN_WEBHOOK_SECRET = os.getenv("LEAN_WEBHOOK_SECRET")
 LEAN_CLIENT_ID = os.getenv("LEAN_CLIENT_ID")
 LEAN_CLIENT_SECRET = os.getenv("LEAN_CLIENT_SECRET")
+
+DIDIT_API_KEY = os.getenv("DIDIT_API_KEY")
+DIDIT_WORKFLOW_ID = os.getenv("DIDIT_WORKFLOW_ID")
+DIDIT_WEBHOOK_SECRET = os.getenv("DIDIT_WEBHOOK_SECRET")
+
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_MESSAGING_SERVICE_SID = os.getenv("TWILIO_MESSAGING_SERVICE_SID")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -78,10 +92,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "accounts",
-    "investments",
     "payments",
     "asset_management.apps.AssetManagementConfig",
     "channels",
+    "dashboard",
+    "ecommerce.apps.EcommerceConfig",
 ]
 
 MIDDLEWARE = [
@@ -123,6 +138,16 @@ CHANNEL_LAYERS = {
         "CONFIG": {
             "hosts": [("172.30.147.217", 6379)],
         },
+    },
+}
+
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
+
+CELERY_BEAT_SCHEDULE = {
+    "run-sips-daily": {
+        "task": "asset_management.tasks.run_due_sips",
+        "schedule": crontab(hour=0, minute=0),  # run daily at midnight
     },
 }
 
@@ -197,6 +222,8 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,  
 }
 
 
@@ -219,11 +246,14 @@ USE_I18N = True
 USE_TZ = True
 
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
-
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
