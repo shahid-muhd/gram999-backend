@@ -57,12 +57,13 @@ class NomineeSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        # If nominee already exists, update instead of creating a new one
+        # If nominee exists → update; else → create new
         nominee, created = Nominee.objects.update_or_create(
             user=user,
             defaults=validated_data
         )
         return nominee
+
 
 
 

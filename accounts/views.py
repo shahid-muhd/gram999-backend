@@ -237,20 +237,26 @@ class NomineeView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        # Return the logged-in user's nominee (or None if not created)
-        nominee, created = Nominee.objects.get_or_create(user=self.request.user)
-        return nominee
+        # Only return existing nominee; don't create new one during GET
+        try:
+            return Nominee.objects.get(user=self.request.user)
+        except Nominee.DoesNotExist:
+            return None
+
+    def get(self, request, *args, **kwargs):
+        nominee = self.get_object()
+        if nominee is None:
+            return Response(
+                {"detail": "Nominee not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = self.get_serializer(nominee)
+        return Response(serializer.data)
 
     def put(self, request, *args, **kwargs):
         nominee = self.get_object()
         serializer = self.get_serializer(nominee, data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    def get(self, request, *args, **kwargs):
-        nominee = self.get_object()
-        serializer = self.get_serializer(nominee)
+        serializer.save()  # Handles update_or_create inside serializer
         return Response(serializer.data)
 
 

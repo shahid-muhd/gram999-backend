@@ -29,19 +29,14 @@ SECRET_KEY = "django-insecure-pka0)@kk=7jnt$6m##e@370gt^b=fn6cmue^31^@nzp=@s3vjl
 
 BACKEND_URL = os.getenv("BACKEND_URL")
 
+METALPRICE_API_KEY = os.getenv("METALPRICE_API_KEY")
 
-SHUFTI_CLIENT_ID = os.getenv("SHUFTI_CLIENT_ID")
-SHUFTI_SECRET_KEY = os.getenv("SHUFTI_SECRET_KEY")
-SHUFTI_API_URL = os.getenv("SHUFTI_API_URL")
+
 LEAN_APP_TOKEN = os.getenv("LEAN_APP_TOKEN")
 LEAN_BASE_URL = os.getenv("LEAN_BASE_URL")
 LEAN_WEBHOOK_SECRET = os.getenv("LEAN_WEBHOOK_SECRET")
 LEAN_CLIENT_ID = os.getenv("LEAN_CLIENT_ID")
 LEAN_CLIENT_SECRET = os.getenv("LEAN_CLIENT_SECRET")
-
-DIDIT_API_KEY = os.getenv("DIDIT_API_KEY")
-DIDIT_WORKFLOW_ID = os.getenv("DIDIT_WORKFLOW_ID")
-DIDIT_WEBHOOK_SECRET = os.getenv("DIDIT_WEBHOOK_SECRET")
 
 
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -147,10 +142,17 @@ CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
 CELERY_BEAT_SCHEDULE = {
     "run-sips-daily": {
         "task": "asset_management.tasks.run_due_sips",
-        "schedule": crontab(hour=0, minute=0),  # run daily at midnight
+        "schedule": crontab(hour=0, minute=0),
+    },
+    "update-metal-prices-every-minute": {
+        "task": "asset_management.tasks.update_metal_prices",
+        "schedule": 60.0,  # every 1 minute
+    },
+    "broadcast-asset-prices-every-minute": {
+        "task": "asset_management.tasks.broadcast_asset_price_task",
+        "schedule": 60.0,
     },
 }
-
 
 CACHES = {
     "default": {
@@ -223,7 +225,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10,  
+    "PAGE_SIZE": 10,
 }
 
 

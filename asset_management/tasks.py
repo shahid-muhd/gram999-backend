@@ -1,34 +1,44 @@
 import random
 import httpx
-import json
-from apscheduler.schedulers.background import BackgroundScheduler
-from channels.layers import get_channel_layer
+from decimal import Decimal
 from asgiref.sync import async_to_sync, sync_to_async
+from channels.layers import get_channel_layer
+from celery import shared_task
+from django.core.cache import cache
+from django.utils import timezone
+from django.conf import settings
+from payments.models import SipPlan
+from .services import run_sip_plan
+
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 
+# ---------------------------------------------
+#  Async function for broadcasting live prices
+# ---------------------------------------------
 async def broadcast_asset_price(asset_projection={}):
     try:
-        gold_price = 325
-        # gold_price = round(random.uniform(320, 410), 2)
-        silver_price = round(random.uniform(210, 300), 2)
-
         from .models import PlatformOptions, PriceAlert, PushToken
 
-        # async ORM (aget is supported)
+        # Get cached prices or defaults
+        gold_price = cache.get("gold_price_aed", Decimal("320"))
+        silver_price = cache.get("silver_price_aed", Decimal("210"))
+
+        # Fetch platform margins
         platform_options = await PlatformOptions.objects.aget(id=1)
 
         if platform_options:
-            gold_price += (float(platform_options.gold_margin or 0) / 100) * gold_price
-            silver_price += (
-                float(platform_options.silver_margin or 0) / 100
-            ) * silver_price
+            gold_margin = Decimal(platform_options.gold_margin or 0) / Decimal("100")
+            silver_margin = Decimal(platform_options.silver_margin or 0) / Decimal("100")
+             
+            gold_price += gold_margin * gold_price
+            silver_price += silver_margin * silver_price
 
         gold_price = round(gold_price, 3)
         silver_price = round(silver_price, 3)
 
-        # Websocket broadcast
+        # WebSocket broadcast
         channel_layer = get_channel_layer()
         await channel_layer.group_send(
             "asset_price",
@@ -39,8 +49,10 @@ async def broadcast_asset_price(asset_projection={}):
                 **asset_projection,
             },
         )
+
         print("✅ broadcasted asset price >>>", gold_price)
-        #  ORM: wrap sync calls with sync_to_async
+
+        # Check price alerts
         alerts = await sync_to_async(list)(
             PriceAlert.objects.filter(is_triggered=False)
         )
@@ -51,7 +63,6 @@ async def broadcast_asset_price(asset_projection={}):
             if (alert.condition == "above" and current_price > alert.target_price) or (
                 alert.condition == "below" and current_price < alert.target_price
             ):
-                #  get tokens
                 tokens = await sync_to_async(
                     lambda: list(
                         PushToken.objects.filter(user=alert.user).values_list(
@@ -59,7 +70,8 @@ async def broadcast_asset_price(asset_projection={}):
                         )
                     )
                 )()
-                print(" price reached triggerring point>>----")
+                print("📈 Price reached trigger point")
+
                 async with httpx.AsyncClient() as client:
                     for token in tokens:
                         message = {
@@ -69,27 +81,27 @@ async def broadcast_asset_price(asset_projection={}):
                             "body": f"{alert.asset.capitalize()} price is now {current_price}",
                         }
                         await client.post(EXPO_PUSH_URL, json=message)
-                        print("<<<notificatgion triggered >>>")
+                        print("📲 Push notification sent")
 
-                alert.is_triggered = True
-                await sync_to_async(lambda: alert.save())()
-
+                # alert.is_triggered = True
+                # await sync_to_async(lambda: alert.save())()
+                await sync_to_async(alert.delete)()
     except Exception as e:
         print(f"❌ Error broadcasting asset price: {e}")
 
 
-def start_scheduler():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(async_to_sync(broadcast_asset_price), "interval", minutes=1)
-    scheduler.start()
+# ---------------------------------------------
+#  Celery task wrapper for broadcasting
+# ---------------------------------------------
+@shared_task
+def broadcast_asset_price_task():
+    """Celery wrapper for async broadcast"""
+    async_to_sync(broadcast_asset_price)()
 
 
-from celery import shared_task
-from django.utils import timezone
-from payments.models import SipPlan
-from .services import run_sip_plan
-
-
+# ---------------------------------------------
+#  SIP daily execution task
+# ---------------------------------------------
 @shared_task
 def run_due_sips():
     """Run all SIPs that are due today"""
@@ -100,5 +112,48 @@ def run_due_sips():
         try:
             run_sip_plan(sip)
         except Exception as e:
-            # you could add logging/alerting here
             print(f"❌ SIP execution failed for {sip.id}: {e}")
+
+
+# ---------------------------------------------
+#  Update metal prices every minute
+# ---------------------------------------------
+@shared_task
+def update_metal_prices():
+    """Fetch latest gold/silver prices from MetalPriceAPI and store in cache"""
+    API_URL = "https://api.metalpriceapi.com/v1/latest"
+    API_KEY = settings.METALPRICE_API_KEY
+    BASE_CURRENCY = "USD"
+    TARGET_CURRENCY = "AED"
+
+    try:
+        response = httpx.get(
+            API_URL,
+            params={
+                "api_key": API_KEY,
+                "base": BASE_CURRENCY,
+                "currencies": f"XAU,XAG,{TARGET_CURRENCY}",
+            },
+            timeout=10,
+        )
+        data = response.json()
+
+        if not data.get("success"):
+            raise ValueError(f"API error: {data}")
+
+        rates = data["rates"]
+        usd_to_aed = Decimal(str(rates.get(TARGET_CURRENCY)))
+
+        gold_per_gram = (Decimal(str(rates["USDXAU"])) / Decimal("31.1035")) * usd_to_aed
+        silver_per_gram = (Decimal(str(rates["USDXAG"])) / Decimal("31.1035")) * usd_to_aed
+
+        cache.set("gold_price_aed", gold_per_gram.quantize(Decimal("0.01")), timeout=120)
+        cache.set("silver_price_aed", silver_per_gram.quantize(Decimal("0.01")), timeout=120)
+
+        print(f"💰 Updated metal prices → Gold: {gold_per_gram:.2f}, Silver: {silver_per_gram:.2f}")
+
+        # Immediately broadcast after update (so data is fresh)
+        async_to_sync(broadcast_asset_price)()
+
+    except Exception as e:
+        print(f"❌ Error updating metal prices: {e}")

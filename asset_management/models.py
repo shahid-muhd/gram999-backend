@@ -45,6 +45,15 @@ class PriceAlert(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "asset", "condition", "target_price"],
+                condition=models.Q(is_triggered=False),
+                name="unique_active_price_alert",
+            )
+        ]
+
 
 class PushToken(models.Model):
     user = models.ForeignKey(
@@ -84,6 +93,7 @@ class GoldLease(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return f"Lease({self.user}, {self.quantity}g, {self.status}, Earnings={self.earnings})"
 

@@ -2,6 +2,7 @@ from .models import PriceAlert
 from django.shortcuts import render
 from rest_framework import serializers, viewsets
 from .models import PriceAlert
+from django.db import IntegrityError
 
 # views.py
 from rest_framework import generics, permissions, status
@@ -44,7 +45,13 @@ class PriceAlertViewSet(viewsets.ModelViewSet):
         return PriceAlert.objects.filter(user=self.request.user, is_triggered=False)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+        try:
+            serializer.save(user=user)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                "You already have an active alert for this condition and price."
+            )
 
 
 from .models import PushToken
@@ -353,7 +360,6 @@ class GoldLeaseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return GoldLease.objects.filter(user=self.request.user)
-
 
     @action(detail=False, methods=["post"])
     def release(self, request):

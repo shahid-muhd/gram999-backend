@@ -19,11 +19,14 @@ class CategorySerializer(serializers.ModelSerializer):
 # Product Image Serializer
 # --------------------------------------------------------
 class ProductImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
     class Meta:
         model = ProductImage
         fields = ["id", "image"]
 
-
+    def get_image(self, obj):
+        # This will return relative path only
+        return f"/media/{obj.image.name}" 
 # --------------------------------------------------------
 # Product Serializer
 # --------------------------------------------------------
