@@ -12,16 +12,37 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+from celery.schedules import crontab
+from dotenv import load_dotenv
+import os
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+load_dotenv(BASE_DIR / ".env")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-pka0)@kk=7jnt$6m##e@370gt^b=fn6cmue^31^@nzp=@s3vjl"
+
+
+BACKEND_URL = os.getenv("BACKEND_URL")
+
+METALPRICE_API_KEY = os.getenv("METALPRICE_API_KEY")
+
+
+LEAN_APP_TOKEN = os.getenv("LEAN_APP_TOKEN")
+LEAN_BASE_URL = os.getenv("LEAN_BASE_URL")
+LEAN_WEBHOOK_SECRET = os.getenv("LEAN_WEBHOOK_SECRET")
+LEAN_CLIENT_ID = os.getenv("LEAN_CLIENT_ID")
+LEAN_CLIENT_SECRET = os.getenv("LEAN_CLIENT_SECRET")
+
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_MESSAGING_SERVICE_SID = os.getenv("TWILIO_MESSAGING_SERVICE_SID")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -31,9 +52,12 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "192.168.1.106",
     "192.168.2.54",
-    "172.10.10.119",  # <-- replace with your computer’s LAN IP
-    ".yourdomain.com",  # <-- production domain
+    "172.10.10.119",
+    "192.168.0.248",
+    "handy-moved-monkfish.ngrok-free.app",
+    ".yourdomain.com",
     "0.0.0.0",
+    "10.0.2.2",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -43,6 +67,12 @@ CORS_ALLOWED_ORIGINS = [
     "https://your-frontend.com",
     "http://localhost",
     "http://127.0.0.1",
+]
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://yourdomain.com",
+    "https://handy-moved-monkfish.ngrok-free.app",
 ]
 
 # Application definition
@@ -57,9 +87,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "accounts",
-    "investments",
+    "payments",
     "asset_management.apps.AssetManagementConfig",
     "channels",
+    "dashboard",
+    "ecommerce.apps.EcommerceConfig",
 ]
 
 MIDDLEWARE = [
@@ -103,6 +135,37 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
+
+CELERY_BEAT_SCHEDULE = {
+    "run-sips-daily": {
+        "task": "asset_management.tasks.run_due_sips",
+        "schedule": crontab(hour=0, minute=0),
+    },
+    "update-metal-prices-every-minute": {
+        "task": "asset_management.tasks.update_metal_prices",
+        "schedule": 60.0,  # every 1 minute
+    },
+    "broadcast-asset-prices-every-minute": {
+        "task": "asset_management.tasks.broadcast_asset_price_task",
+        "schedule": 60.0,
+    },
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://172.30.147.217:6379/1",  # notice /1 → DB index 1
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "KEY_PREFIX": "lean",  # a
+        },
+    }
+}
+
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -161,11 +224,13 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
 }
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
@@ -183,11 +248,14 @@ USE_I18N = True
 USE_TZ = True
 
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
-
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
