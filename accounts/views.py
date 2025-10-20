@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-
+import traceback
 import json
 from random import randint
 from .models import CustomUser
@@ -86,7 +86,7 @@ class VerificationAPIView(APIView):
         contact = email or phone
         contact_type = "email" if email else "phone"
 
-        # Handle OTP Verification
+        # --- OTP Verification ---
         if otp:
             try:
                 otp_obj = OTPVerification.objects.get(
@@ -115,28 +115,26 @@ class VerificationAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # If OTP not provided, generate and send
-        # Remove existing OTPs for this contact
+        # --- Send OTP ---
         try:
             print("contact>>>.", contact, contact_type)
             send_otp(contact, contact_type)
-            response_data = {
-                "success": True,
-            }
+            return Response(
+                {"success": True, "message": "OTP sent successfully."},
+                status=status.HTTP_200_OK,
+            )
 
-            return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
             print("Error sending OTP:", e)
-            import traceback
-
             traceback.print_exc()
 
+            # Return safe 200 so frontend doesn’t get blocked
             return Response(
                 {
                     "success": False,
-                    "message": f"Failed to send OTP. Error: {str(e)}",
+                    "message": f"OTP service temporarily unavailable. Error: {str(e)}",
                 },
-                status=status.HTTP_204_NO_CONTENT,
+                status=status.HTTP_200_OK,  # 👈 success range code
             )
 
 
