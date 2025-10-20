@@ -58,7 +58,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
-
 class Address(models.Model):
     ADDRESS_TYPES = [
         ("Home", "Home"),
