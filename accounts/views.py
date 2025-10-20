@@ -126,7 +126,18 @@ class VerificationAPIView(APIView):
 
             return Response(response_data, status=status.HTTP_200_OK)
         except Exception as e:
-            print(e)
+            print("Error sending OTP:", e)
+            import traceback
+
+            traceback.print_exc()
+
+            return Response(
+                {
+                    "success": False,
+                    "message": f"Failed to send OTP. Error: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 @api_view(["POST"])
