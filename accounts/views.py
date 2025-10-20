@@ -136,7 +136,7 @@ class VerificationAPIView(APIView):
                     "success": False,
                     "message": f"Failed to send OTP. Error: {str(e)}",
                 },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status=status.HTTP_204_NO_CONTENT,
             )
 
 
