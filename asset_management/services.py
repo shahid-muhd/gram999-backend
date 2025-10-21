@@ -55,6 +55,7 @@ def run_sip_plan(sip: SipPlan):
         total_value=sip.amount,
         transaction_type="sip",
         payment_intent=None,
+        sip=sip,
     )
 
     # Update balance

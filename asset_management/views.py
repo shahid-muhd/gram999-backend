@@ -280,6 +280,8 @@ from django.utils import timezone
 from datetime import timedelta
 from .serializers import SipPlanSerializer
 from .services import run_sip_plan
+from django.db.models import Sum
+from rest_framework.exceptions import ValidationError
 
 
 class SipPlanViewSet(viewsets.ModelViewSet):
@@ -288,17 +290,29 @@ class SipPlanViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         today = timezone.now().date()
-        # Return SIPs that are not terminated and not expired
         return SipPlan.objects.filter(
-            user=self.request.user,
-        ).filter(
-            end_date__isnull=True
+            user=self.request.user, end_date__isnull=True
         ) | SipPlan.objects.filter(user=self.request.user, end_date__gt=today)
 
     def perform_create(self, serializer):
-        # Calculate initial next_run based on frequency
+        user = self.request.user
         today = timezone.now().date()
+        sip_amount = serializer.validated_data["amount"]
         freq = serializer.validated_data["frequency"]
+
+        # Check if wallet exists and has enough balance
+        try:
+            wallet = Wallet.objects.get(user=user)
+        except Wallet.DoesNotExist:
+            raise ValidationError("Wallet not found. Please add money first.")
+
+        if wallet.balance < sip_amount:
+            raise ValidationError(
+                f"Insufficient wallet balance. You need AED{sip_amount}, "
+           
+            )
+
+        # Calculate initial next_run
         if freq == SipFrequency.DAILY:
             next_run = today + timedelta(days=1)
         elif freq == SipFrequency.WEEKLY:
@@ -306,12 +320,16 @@ class SipPlanViewSet(viewsets.ModelViewSet):
         else:  # monthly
             next_run = today + timedelta(days=31)
 
+        # Create SIP
         sip = serializer.save(
-            user=self.request.user,
+            user=user,
             next_run=next_run,
             start_date=today,
         )
+
+        # Execute initial SIP transaction
         run_sip_plan(sip)
+    
 
     @action(detail=True, methods=["post"])
     def disable(self, request, pk=None):
@@ -342,6 +360,48 @@ class SipPlanViewSet(viewsets.ModelViewSet):
         sip = self.get_object()
         result = run_sip_plan(sip)
         return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="details")
+    def sip_details(self, request, pk=None):
+        """
+        Return full SIP details + last 5 ledger entries + total invested amount
+        """
+        sip = self.get_object()  # already ensures sip belongs to request.user
+
+        # Last 5 ledger entries
+        last_ledgers = (
+            LedgerEntry.objects.filter(sip=sip)
+            .order_by("-created_at")[:5]
+            .values(
+                "id",
+                "asset_type",
+                "quantity",
+                "price_per_unit",
+                "total_value",
+                "transaction_type",
+                "created_at",
+            )
+        )
+
+        # Total invested in this SIP (sum of all ledger total_value)
+        total_invested = (
+            LedgerEntry.objects.filter(sip=sip, transaction_type="sip").aggregate(
+                total=Sum("total_value")
+            )["total"]
+            or 0
+        )
+
+        # Serialize SIP
+        sip_data = SipPlanSerializer(sip).data
+
+        # Combine response
+        response = {
+            "sip": sip_data,
+            "last_ledgers": list(last_ledgers),
+            "total_invested": total_invested,
+        }
+
+        return Response(response)
 
 
 from rest_framework import viewsets, permissions

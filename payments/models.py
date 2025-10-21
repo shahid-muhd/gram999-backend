@@ -2,6 +2,12 @@ from django.conf import settings
 from django.db import models
 
 
+
+class AssetType(models.TextChoices):
+    GOLD = "gold", "Gold"
+    SILVER = "silver", "Silver"
+
+
 class LeanCustomer(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     lean_customer_id = models.CharField(max_length=128, null=True, blank=True)
@@ -45,73 +51,10 @@ class PaymentIntent(models.Model):
         return f"Intent({self.payment_intent_id}, {self.amount} {self.currency})"
 
 
-# --- Ledger for Gold & Silver ---
 
 
-class AssetType(models.TextChoices):
-    GOLD = "gold", "Gold"
-    SILVER = "silver", "Silver"
-
-
-class LedgerEntry(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    asset_type = models.CharField(max_length=16, choices=AssetType.choices)
-    quantity = models.DecimalField(
-        max_digits=18, decimal_places=4, help_text="Quantity of asset (grams)"
-    )
-    price_per_unit = models.DecimalField(
-        max_digits=18, decimal_places=2, help_text="Price per gram at transaction time"
-    )
-    total_value = models.DecimalField(max_digits=18, decimal_places=2)
-    transaction_type = models.CharField(
-        max_length=16, choices=[("buy", "Buy"), ("sell", "Sell"), ("sip", "SIP")]
-    )
-    payment_intent = models.ForeignKey(
-        PaymentIntent, on_delete=models.SET_NULL, null=True, blank=True
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Ledger({self.user}, {self.asset_type}, {self.transaction_type}, {self.quantity}g)"
-
-from django.db.models import Q, CheckConstraint, F
-
-class Balance(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-
-    gold_quantity = models.DecimalField(max_digits=18, decimal_places=4, default=0)
-    silver_quantity = models.DecimalField(max_digits=18, decimal_places=4, default=0)
-    leased_gold_quantity = models.DecimalField(
-        max_digits=18, decimal_places=4, default=0
-    )
-
-    gold_invested_amount = models.DecimalField(
-        max_digits=18, decimal_places=2, default=0
-    )
-    silver_invested_amount = models.DecimalField(
-        max_digits=18, decimal_places=2, default=0
-    )
-
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints = [
-            CheckConstraint(
-                check=Q(leased_gold_quantity__lte=F("gold_quantity")),
-                name="leased_gold_lte_gold_quantity",
-            )
-        ]
-
-    def __str__(self):
-        return (
-            f"Balance({self.user}, Gold={self.gold_quantity}g, Silver={self.silver_quantity}g, "
-            f"Leased Gold={self.leased_gold_quantity}g, "
-            f"Gold Invested={self.gold_invested_amount}, Silver Invested={self.silver_invested_amount})"
-        )
 
 # --- SIP Plan ---
-
-
 class SipFrequency(models.TextChoices):
     DAILY = "daily", "Daily"
     WEEKLY = "weekly", "Weekly"
@@ -154,6 +97,71 @@ class SipPlan(models.Model):
 
     def __str__(self):
         return f"SipPlan({self.user}, {self.asset_type}, {self.amount}, {self.frequency}, {self.type})"
+
+
+
+
+# --- Ledger for Gold & Silver ---
+
+
+
+
+class LedgerEntry(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    asset_type = models.CharField(max_length=16, choices=AssetType.choices)
+    quantity = models.DecimalField(
+        max_digits=18, decimal_places=4, help_text="Quantity of asset (grams)"
+    )
+    price_per_unit = models.DecimalField(
+        max_digits=18, decimal_places=2, help_text="Price per gram at transaction time"
+    )
+    total_value = models.DecimalField(max_digits=18, decimal_places=2)
+    transaction_type = models.CharField(
+        max_length=16, choices=[("buy", "Buy"), ("sell", "Sell"), ("sip", "SIP")]
+    )
+    payment_intent = models.ForeignKey(
+        PaymentIntent, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    sip = models.ForeignKey(SipPlan, on_delete=models.SET_NULL, null=True, blank=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Ledger({self.user}, {self.asset_type}, {self.transaction_type}, {self.quantity}g)"
+
+from django.db.models import Q, CheckConstraint, F
+
+class Balance(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+    gold_quantity = models.DecimalField(max_digits=18, decimal_places=4, default=0)
+    silver_quantity = models.DecimalField(max_digits=18, decimal_places=4, default=0)
+    leased_gold_quantity = models.DecimalField(
+        max_digits=18, decimal_places=4, default=0
+    )
+
+    gold_invested_amount = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0
+    )
+    silver_invested_amount = models.DecimalField(
+        max_digits=18, decimal_places=2, default=0
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            CheckConstraint(
+                check=Q(leased_gold_quantity__lte=F("gold_quantity")),
+                name="leased_gold_lte_gold_quantity",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"Balance({self.user}, Gold={self.gold_quantity}g, Silver={self.silver_quantity}g, "
+            f"Leased Gold={self.leased_gold_quantity}g, "
+            f"Gold Invested={self.gold_invested_amount}, Silver Invested={self.silver_invested_amount})"
+        )
 
 
 class Wallet(models.Model):
