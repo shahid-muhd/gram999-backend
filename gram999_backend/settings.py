@@ -55,7 +55,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "handy-moved-monkfish.ngrok-free.app",
     ".yourdomain.com",
-    "3.28.60.193",
+    "40.172.107.249",
     "0.0.0.0",
     "10.0.2.2",
 ]
