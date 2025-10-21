@@ -54,8 +54,8 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "handy-moved-monkfish.ngrok-free.app",
-    ".yourdomain.com",
-    "40.172.107.249",
+    "server.gram999.com",
+    "158.252.23.209",
     "10.0.2.2",
 ]
 CORS_ALLOW_ALL_ORIGINS = True
