@@ -135,30 +135,54 @@ def sendKycRequest(user: CustomUser):
     return client.create_session(payload)
 
 
-def update_kyc_status(session_id: "str", status: bool):
-    client = DiditClient(version="v1")
-    client.update_session_status(session_id, status)
+def change_user_data(user: CustomUser, id_data: dict):
+    # client = DiditClient(version="v1")
+    # client.update_session_status(session_id, status)
+    pass
 
 
-def is_user_data_valid(user: CustomUser, id_data: dict) -> bool:
+from datetime import datetime
+
+
+def sync_user_with_id_data(user: CustomUser, id_data: dict) -> CustomUser:
     """
-    Validates user profile against extracted ID card data.
-    - Matches DOB
-    - Matches full name (case insensitive, space normalized)
+    Syncs user's data with extracted ID card data.
+
+    Updates:
+    - first_name and last_name from id_data["full_name"]
+    - dob from id_data["dob"] (converted to DRF-acceptable date format)
     """
 
-    full_name = f"{user.first_name or ''} {user.last_name or ''}"
-    first_name = full_name.split(" ")[0]
+    id_full_name = id_data.get("full_name", "").strip()
+    id_dob = id_data.get("dob")
 
-    id_full_name = id_data.get("full_name", "").lower()
+    # ✅ Handle name splitting safely
+    name_parts = id_full_name.split(" ", 1)
+    user.first_name = name_parts[0].title() if name_parts else ""
 
-    if user.dob != id_data.get("dob"):
-        return False
+    if len(name_parts) > 1:
+        user.last_name = name_parts[1].title()
+    else:
+        user.last_name = ""
 
-    if first_name not in id_full_name:
-        return False
+    # ✅ Normalize DOB (accepts 'YYYY-MM-DD', 'DD/MM/YYYY', etc.)
+    if id_dob:
+        try:
+            # Try parsing in multiple formats
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
+                try:
+                    parsed_dob = datetime.strptime(id_dob, fmt).date()
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError("Unsupported DOB format")
 
-    return True
+            user.dob = parsed_dob
+        except Exception as e:
+            print(f"⚠️ DOB parsing failed: {e}")
+
+    user.save()
 
 
 from channels.db import database_sync_to_async

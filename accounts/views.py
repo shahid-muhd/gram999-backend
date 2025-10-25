@@ -194,17 +194,15 @@ def kyc_callback(request):
             "dob": id_verification.get("date_of_birth"),
         }
 
-        from .utils import is_user_data_valid, update_kyc_status
+        from .utils import sync_user_with_id_data
 
         # --- Update user ---
         if vendor_data:
             try:
                 user = CustomUser.objects.get(id=int(vendor_data))
                 if status == "Approved":
-                    # if is_user_data_valid(user, user_id_data) is not True:
-                    #     update_kyc_status(session_id, "Declined")
-                    # else:
                     user.kyc_status = "accepted"
+                    sync_user_with_id_data(user, user_id_data)
                 elif status == "Declined":
                     user.kyc_status = "declined"
                 elif status == "In Review":
