@@ -14,9 +14,9 @@ from payments.models import (
 from .models import PushToken
 from .utils import send_push_notification
 from asgiref.sync import async_to_sync
+from dateutil.relativedelta import relativedelta
 
-
-def run_sip_plan(sip: SipPlan):
+def run_sip_plan(sip: SipPlan,is_initial=False):
     user = sip.user
     try:
         wallet = Wallet.objects.get(user=user)
@@ -69,13 +69,14 @@ def run_sip_plan(sip: SipPlan):
     bal.save()
 
     # Update next_run
-    today = timezone.now().date()
-    if sip.frequency == SipFrequency.DAILY:
-        sip.next_run = today + timedelta(days=1)
-    elif sip.frequency == SipFrequency.WEEKLY:
-        sip.next_run = today + timedelta(weeks=1)
-    elif sip.frequency == SipFrequency.MONTHLY:
-        sip.next_run = today + timedelta(days=30)
+    if not is_initial:
+        today = timezone.now().date()
+        if sip.frequency == SipFrequency.DAILY:
+            sip.next_run = today + timedelta(days=1)
+        elif sip.frequency == SipFrequency.WEEKLY:
+            sip.next_run = today + timedelta(weeks=1)
+        elif sip.frequency == SipFrequency.MONTHLY:
+            sip.next_run = today + relativedelta(months=1)
 
     # Goal-based SIP: check if goal reached
     if sip.type == SipType.GOAL:

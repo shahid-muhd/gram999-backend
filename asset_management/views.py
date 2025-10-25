@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from payments.models import Balance
-
+from dateutil.relativedelta import relativedelta
 
 class PlatformOptionsRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = PlatformOptionsSerializer
@@ -318,7 +318,7 @@ class SipPlanViewSet(viewsets.ModelViewSet):
         elif freq == SipFrequency.WEEKLY:
             next_run = today + timedelta(weeks=1)
         else:  # monthly
-            next_run = today + timedelta(days=31)
+            next_run = today + relativedelta(months=1)
 
         # Create SIP
         sip = serializer.save(
