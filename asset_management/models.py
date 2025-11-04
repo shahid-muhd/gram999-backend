@@ -8,10 +8,16 @@ from accounts.models import CustomUser
 
 class PlatformOptions(models.Model):
     gold_margin = models.DecimalField(
-        default=0, max_digits=10, decimal_places=3, verbose_name="Gold Margin (%)"
+        default=1.2, max_digits=10, decimal_places=3, verbose_name="Gold Margin (%)"
     )
     silver_margin = models.DecimalField(
-        default=0, max_digits=10, decimal_places=3, verbose_name="Silver Margin (%)"
+        default=1.2, max_digits=10, decimal_places=3, verbose_name="Silver Margin (%)"
+    )
+    gold_markdown = models.DecimalField(
+        default=1.7, max_digits=10, decimal_places=3, verbose_name="Gold Markdown (%)"
+    )
+    silver_markdown = models.DecimalField(
+        default=1.7, max_digits=10, decimal_places=3, verbose_name="Silver Markdown (%)"
     )
     gold_appreciation = models.DecimalField(
         max_digits=10, decimal_places=3, default=0, verbose_name="Gold Appreciation (%)"

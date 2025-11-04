@@ -241,3 +241,7 @@ class WalletTransaction(models.Model):
             f"WalletTransaction({self.wallet.user}, {self.transaction_type}, "
             f"{self.amount}, Intent={self.payment_intent_id})"
         )
+
+
+
+

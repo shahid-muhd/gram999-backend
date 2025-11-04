@@ -2,7 +2,7 @@ import os
 import json
 import hmac
 import hashlib
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal
 from datetime import date
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -220,13 +220,15 @@ def get_wallet(request):
     )
 
 
+from rest_framework.settings import api_settings 
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_wallet_transactions(request):
     """
     Get wallet transactions for the authenticated user.
     Admins can use ?user_id=<id> to fetch another user's transactions.
-    Optional query param: ?limit=10 (default = 6)
+    Uses global pagination settings.
     """
     user = request.user
     user_id = request.query_params.get("user_id")
@@ -241,15 +243,14 @@ def get_wallet_transactions(request):
 
     wallet, _ = Wallet.objects.get_or_create(user=user)
 
-    try:
-        limit = int(request.query_params.get("limit", 6))
-        limit = limit if limit > 0 else 6
-    except ValueError:
-        limit = 6
+    queryset = WalletTransaction.objects.filter(wallet=wallet).order_by("-created_at")
 
-    transactions = WalletTransaction.objects.filter(wallet=wallet).order_by(
-        "-created_at"
-    )[:limit]
+    # ✅ Use the global pagination class from DRF settings
+    paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
+    paginator = paginator_class()
+
+    # Paginate queryset (respects ?page= query param)
+    page = paginator.paginate_queryset(queryset, request)
 
     data = [
         {
@@ -262,28 +263,72 @@ def get_wallet_transactions(request):
             "created_at": tx.created_at,
             "description": tx.get_description_display(),
         }
-        for tx in transactions
+        for tx in page
     ]
 
-    return Response(
-        {"user_id": user.id, "transactions": data},
-        status=status.HTTP_200_OK,
-    )
-
+    # ✅ Return paginated response using global pagination format
+    return paginator.get_paginated_response(data)
 
 from rest_framework import viewsets, permissions
 from .models import LedgerEntry
 from .serializers import LedgerEntrySerializer
-
-
+from ecommerce.models import Order
+from ecommerce.serializers import OrderListSerializer
 class UserLedgerViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Returns ledger entries (orders) for the logged-in user.
+    Returns combined ledger entries and orders for the logged-in user.
     """
-
     serializer_class = LedgerEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
         return LedgerEntry.objects.filter(user=user).order_by("-created_at")
+    
+    def list(self, request, *args, **kwargs):
+        # Get ledger entries
+        ledger_queryset = self.get_queryset()
+        ledger_serializer = LedgerEntrySerializer(ledger_queryset, many=True)
+        
+        # Get orders
+        orders_queryset = Order.objects.filter(user=request.user).order_by("-created_at")
+        orders_serializer = OrderListSerializer(orders_queryset, many=True)
+        
+        # Combine both lists
+        combined_data = ledger_serializer.data + orders_serializer.data
+        
+        # Sort by created_at in descending order
+        combined_data.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        # Paginate if needed
+        page = self.paginate_queryset(combined_data)
+        if page is not None:
+            return self.get_paginated_response(page)
+        
+        return Response(combined_data)
+    
+    def retrieve(self, request, *args, **kwargs):
+        # Try to get from ledger first
+        try:
+            ledger_entry = LedgerEntry.objects.get(
+                id=kwargs['pk'], 
+                user=request.user
+            )
+            serializer = LedgerEntrySerializer(ledger_entry)
+            return Response(serializer.data)
+        except LedgerEntry.DoesNotExist:
+            pass
+        
+        # If not found in ledger, try orders
+        try:
+            order = Order.objects.get(
+                id=kwargs['pk'], 
+                user=request.user
+            )
+            serializer = OrderListSerializer(order)
+            return Response(serializer.data)
+        except Order.DoesNotExist:
+            return Response(
+                {"detail": "Not found."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )

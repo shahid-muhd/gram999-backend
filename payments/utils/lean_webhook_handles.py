@@ -4,10 +4,10 @@ from ..models import (
     Wallet,
     LeanCustomer,
     LeanEntity,
-    AssetType,
+    
 )
-from decimal import Decimal, ROUND_DOWN
-from asset_management.utils import get_price_per_gram
+from decimal import Decimal
+
 
 logger = logging.getLogger(__name__)
 

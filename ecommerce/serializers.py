@@ -119,4 +119,34 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = "__all__"
-        read_only_fields = ["user", "created_at", "updated_at"]
+        read_only_fields = ["user", "created_at", "updated_at","total_amount"]
+
+
+class OrderListSerializer(serializers.ModelSerializer):
+    """Serializer for Order model in combined ledger view - only essential fields"""
+    source = serializers.SerializerMethodField()
+    transaction_type = serializers.SerializerMethodField()
+    total_value = serializers.DecimalField(
+        source='total_amount', 
+        max_digits=10, 
+        decimal_places=2,
+        read_only=True
+    )
+    
+    class Meta:
+        model = Order
+        fields = (
+            "id",
+            "total_value",
+            "status",
+            "payment_status",
+            "created_at",
+            "source",
+            "transaction_type",
+        )
+    
+    def get_source(self, obj):
+        return "order"
+    
+    def get_transaction_type(self, obj):
+        return "shop"

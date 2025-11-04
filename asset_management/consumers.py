@@ -28,8 +28,10 @@ class AssetPriceConsumer(AsyncWebsocketConsumer):
     async def asset_price_update(self, event):
 
         payload = {
-            "gold_price": event["gold_price"],
-            "silver_price": event["silver_price"],
+            "gold_buy_price": event["gold_buy_price"],
+            "silver_buy_price": event["silver_buy_price"],
+            "gold_sell_price": event["gold_sell_price"],
+            "silver_sell_price": event["silver_sell_price"],
         }
 
         if "gold_appreciation" in event:
