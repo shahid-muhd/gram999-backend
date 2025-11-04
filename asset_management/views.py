@@ -19,6 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from payments.models import Balance
 from dateutil.relativedelta import relativedelta
 
+
 class PlatformOptionsRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     serializer_class = PlatformOptionsSerializer
 
@@ -129,8 +130,12 @@ class BuyAssetView(APIView):
             )
 
         # 2️⃣ Calculate total purchase value
-        price_per_unit = get_price_per_gram(asset_type)
-        total_value = quantize_amount(quantity * price_per_unit)
+        price_per_unit = get_price_per_gram(asset_type)["buy"]
+        total_value = quantize_amount(quantity * price_per_unit, 2)
+
+        print("payload >>", request.data)
+        print("price per unit  >>", price_per_unit)
+        print("total value >>", total_value)
 
         # 3️⃣ Check wallet balance
         if wallet.balance < total_value:
@@ -224,20 +229,29 @@ class SellAssetView(APIView):
             )
 
         # 2️⃣ Calculate sale value
-        price_per_unit = get_price_per_gram(asset_type)
-        total_value = quantize_amount(quantity * price_per_unit)
+        price_per_unit = get_price_per_gram(asset_type)["sell"]
+        total_value = quantize_amount(quantity * price_per_unit, 2)
 
         # 3️⃣ Deduct from balance
         if asset_type == AssetType.GOLD:
-            bal.gold_quantity = quantize_amount(bal.gold_quantity - quantity)
-            bal.gold_invested_amount = max(
-                (bal.gold_invested_amount or 0) - total_value, 0
-            )
+            prev_quantity = bal.gold_quantity
+            prev_invested = bal.gold_invested_amount or Decimal("0")
+            new_quantity = quantize_amount(prev_quantity - quantity)
+
+            if prev_quantity > 0:
+                ratio = new_quantity / prev_quantity
+                bal.gold_invested_amount = quantize_amount(prev_invested * ratio, 2)
+            bal.gold_quantity = new_quantity
+
         else:
-            bal.silver_quantity = quantize_amount(bal.silver_quantity - quantity)
-            bal.silver_invested_amount = max(
-                (bal.silver_invested_amount or 0) - total_value, 0
-            )
+            prev_quantity = bal.silver_quantity
+            prev_invested = bal.silver_invested_amount or Decimal("0")
+            new_quantity = quantize_amount(prev_quantity - quantity)
+
+            if prev_quantity > 0:
+                ratio = new_quantity / prev_quantity
+                bal.silver_invested_amount = quantize_amount(prev_invested * ratio, 2)
+                bal.silver_quantity = new_quantity
         bal.save()
 
         # 4️⃣ Create LedgerEntry
@@ -309,7 +323,6 @@ class SipPlanViewSet(viewsets.ModelViewSet):
         if wallet.balance < sip_amount:
             raise ValidationError(
                 f"Insufficient wallet balance. You need AED{sip_amount}, "
-           
             )
 
         # Calculate initial next_run
@@ -329,7 +342,6 @@ class SipPlanViewSet(viewsets.ModelViewSet):
 
         # Execute initial SIP transaction
         run_sip_plan(sip)
-    
 
     @action(detail=True, methods=["post"])
     def disable(self, request, pk=None):

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.conf import settings
 from payments.models import SipPlan
 from .services import run_sip_plan
-
+from .utils import calculate_metal_prices
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
@@ -21,36 +21,26 @@ async def broadcast_asset_price(asset_projection={}):
     try:
         from .models import PlatformOptions, PriceAlert, PushToken
 
-        # Get cached prices or defaults
-        gold_price = cache.get("gold_price_aed", Decimal("320"))
-        silver_price = cache.get("silver_price_aed", Decimal("210"))
+        prices = await calculate_metal_prices()
+        prices = {k: float(v) for k, v in prices.items()}
 
-        # Fetch platform margins
-        platform_options = await PlatformOptions.objects.aget(id=1)
-
-        if platform_options:
-            gold_margin = Decimal(platform_options.gold_margin or 0) / Decimal("100")
-            silver_margin = Decimal(platform_options.silver_margin or 0) / Decimal("100")
-             
-            gold_price += gold_margin * gold_price
-            silver_price += silver_margin * silver_price
-
-        gold_price = round(gold_price, 3)
-        silver_price = round(silver_price, 3)
-
+        print("prices>>>", prices)
         # WebSocket broadcast
         channel_layer = get_channel_layer()
         await channel_layer.group_send(
             "asset_price",
             {
                 "type": "asset_price_update",
-                "gold_price": float(gold_price),
-                "silver_price": float(silver_price),
+                # "gold_buy_price": float(gold_buy_price),
+                # "silver_buy_price": float(silver_buy_price),
+                # "gold_sell_price": float(gold_sell_price),
+                # "silver_sell_price": float(silver_sell_price),
+                **prices,
                 **asset_projection,
             },
         )
 
-        print("✅ broadcasted asset price >>>", gold_price)
+        print("✅ broadcasted asset price >>>", prices)
 
         # Check price alerts
         alerts = await sync_to_async(list)(
@@ -58,7 +48,11 @@ async def broadcast_asset_price(asset_projection={}):
         )
 
         for alert in alerts:
-            current_price = gold_price if alert.asset == "gold" else silver_price
+            current_price = (
+                prices["gold_buy_price"]
+                if alert.asset == "gold"
+                else prices["silver_buy_price"]
+            )
 
             if (alert.condition == "above" and current_price > alert.target_price) or (
                 alert.condition == "below" and current_price < alert.target_price
@@ -144,13 +138,25 @@ def update_metal_prices():
         rates = data["rates"]
         usd_to_aed = Decimal(str(rates.get(TARGET_CURRENCY)))
 
-        gold_per_gram = (Decimal(str(rates["USDXAU"])) / Decimal("31.1035")) * usd_to_aed
-        silver_per_gram = (Decimal(str(rates["USDXAG"])) / Decimal("31.1035")) * usd_to_aed
+        gold_per_gram = (
+            Decimal(str(rates["USDXAU"])) / Decimal("31.1035")
+        ) * usd_to_aed
+        silver_per_gram = (
+            Decimal(str(rates["USDXAG"])) / Decimal("31.1035")
+        ) * usd_to_aed
 
-        cache.set("gold_price_aed", gold_per_gram.quantize(Decimal("0.01")), timeout=120)
-        cache.set("silver_price_aed", silver_per_gram.quantize(Decimal("0.01")), timeout=120)
+        cache.set(
+            "gold_buy_price_aed", gold_per_gram.quantize(Decimal("0.01")), timeout=120
+        )
+        cache.set(
+            "silver_buy_price_aed",
+            silver_per_gram.quantize(Decimal("0.01")),
+            timeout=120,
+        )
 
-        print(f"💰 Updated metal prices → Gold: {gold_per_gram:.2f}, Silver: {silver_per_gram:.2f}")
+        print(
+            f"💰 Updated metal prices → Gold: {gold_per_gram:.2f}, Silver: {silver_per_gram:.2f}"
+        )
 
         # Immediately broadcast after update (so data is fresh)
         async_to_sync(broadcast_asset_price)()

@@ -39,7 +39,7 @@ def run_sip_plan(sip: SipPlan,is_initial=False):
         return {"error": "Insufficient wallet balance"}
 
     # Proceed with normal SIP execution
-    price_per_unit = get_price_per_gram(sip.asset_type)
+    price_per_unit = get_price_per_gram(sip.asset_type)['buy']
     quantity = quantize_amount(sip.amount / price_per_unit)
 
     # Deduct wallet
