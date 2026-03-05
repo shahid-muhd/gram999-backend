@@ -63,7 +63,7 @@ class ProductViewSet(CacheResponseMixin, viewsets.ModelViewSet):
         queryset = (
             Product.objects.all()
             if self.request.user.is_staff
-            else Product.objects.filter(is_active=True)
+            else Product.objects.filter(                                                    =True)
         )
 
         category_id = self.request.query_params.get("category")
